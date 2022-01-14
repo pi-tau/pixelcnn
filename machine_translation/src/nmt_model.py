@@ -432,7 +432,6 @@ class NMT(nn.Module):
 
     def save(self, path):
         """Save the model to a file."""
-        print("save model parameters to [%s]" % path)
         params = {
             "args": dict(word_embed_size=self.model_embeddings_source.word_embed_size,
                          char_embed_size=self.model_embeddings_source.char_embed_size,

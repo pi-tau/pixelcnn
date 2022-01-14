@@ -213,9 +213,7 @@ class Vocab:
             freq_cutoff (int): If word occurs n < freq_cutoff times, drop the word.
         """
         assert len(src_sents) == len(tgt_sents)
-        print("initialize source vocabulary ..")
         src = VocabEntry.from_corpus(src_sents, vocab_size, freq_cutoff)
-        print("initialize target vocabulary ..")
         tgt = VocabEntry.from_corpus(tgt_sents, vocab_size, freq_cutoff)
         return Vocab(src, tgt)
 

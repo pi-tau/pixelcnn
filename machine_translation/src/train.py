@@ -1,4 +1,5 @@
 import time
+import sys
 
 import numpy as np
 import torch
@@ -8,7 +9,7 @@ from src.utils import batch_iter, eval_ppl
 
 
 def train(model, data, learning_rate, lr_decay, clip_grad, batch_size, max_epochs,
-          max_num_trial, patience_limit, model_save_path, verbose=False):
+          max_num_trial, patience_limit, model_save_path, stdout=sys.stdout):
     """Run optimization to train the model. Save the best performing model parameters.
 
     Args:
@@ -22,15 +23,16 @@ def train(model, data, learning_rate, lr_decay, clip_grad, batch_size, max_epoch
         max_num_trial (int): The number of trials before termination.
         patience_limit (int): The number of epochs to wait before returning to the best model.
         model_save_path (str): File path to save the model.
-        verbose (bool): If set to false then no output will be printed during training.
+        stdout (file, optional): File object (stream) used for standard output of logging
+            information. Default value is `sys.stdout`.
     """
     # Put the model in training mode.
     model.train()
 
     # Check if 'cuda' is available.
-    # device = xm.xla_device() # tpu
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    print("Using device: %s" % device)
+    # device = xm.xla_device() # tpu
+    print("Using device: %s" % device, file=stdout)
 
     # Send the model to device.
     model = model.to(device)
@@ -40,7 +42,7 @@ def train(model, data, learning_rate, lr_decay, clip_grad, batch_size, max_epoch
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=lr_decay)
 
     # Begin training.
-    print("Begin training..")
+    print("Begin training..", file=stdout)
     epoch = patience = num_trial = 0
     best_dev_ppl = 0.
     while True:
@@ -74,58 +76,46 @@ def train(model, data, learning_rate, lr_decay, clip_grad, batch_size, max_epoch
         toc = time.time()
 
         # Printout results.
-        if verbose:
-            print("Epoch (%d/%d), train time: %.2f min, avg loss: %.1f, avg train ppl: %.1f, dev ppl: %.1f" % (
-                epoch, max_epochs, (toc-tic)/60, avg_loss, train_ppl, dev_ppl))
+        print("Epoch (%d/%d), train time: %.2f min, avg loss: %.1f, avg train ppl: %.1f, dev ppl: %.1f" % (
+            epoch, max_epochs, (toc-tic)/60, avg_loss, train_ppl, dev_ppl), file=stdout)
 
         # If the model is performing better than it was on the previous epoch, then save
         # the model parameters and the optimizer state.
         # If the model is performing worse than it was on the previous epoch, then
-        # increase the patience.
-        # if the patience reaches a limit decay the learning rate and increase trial count.
-        #### if the patience reaches a limit, reload the previous parameters, decay the
-        #### learning rate, and increase trial count.
+        # increase the patience. if the patience reaches a limit decay the learning rate
+        # and increase trial count.
         if best_dev_ppl == 0 or dev_ppl < best_dev_ppl:
-            print("saving the new best model..")
             best_dev_ppl = dev_ppl
+            print(f"saving the new best model to [{model_save_path}]..", file=stdout)
             model.save(model_save_path)
             torch.save(optimizer.state_dict(), model_save_path + ".optim")
             patience = 0
         else:
             patience += 1
-            print("increaseing patience = %d" % patience)
+            print("increasing patience = %d" % patience, file=stdout)
             if patience >= patience_limit:
-                # print("loading the previous best model..")
-                # params = torch.load(model_save_path, map_location=lambda storage, loc: storage)
-                # model.load_state_dict(params["state_dict"])
-                # model.train()
-                # model = model.to(device)
-                # optimizer.load_state_dict(torch.load(model_save_path + ".optim"))
-
                 # Reset patience.
                 patience = 0
 
                 # Increase the trial count.
                 num_trial += 1
-                print("increasing num trial:", num_trial)
+                print("increasing num trial: %d" % num_trial, file=stdout)
 
                 # Decay the learning rate.
                 lr_scheduler.step()
 
         # If the trial count reaches the maximum number of trials, stop the training.
         if num_trial >= max_num_trial:
-            print("Reached maximum number of trials!")
+            print("Reached maximum number of trials!", file=stdout)
             break
 
         # If the maximum number of epochs is reached, stop the training.
         if epoch == max_epochs:
-            print("Reached maximum number of epochs!")
+            print("Reached maximum number of epochs!", file=stdout)
             break
 
-    ###### # Save the final model parameters.
-    ###### model.save(model_save_path)
-
     # Load the best saved model.
+    print("loading the best performing model..", file=stdout)
     params = torch.load(model_save_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(params["state_dict"])
     model.train()

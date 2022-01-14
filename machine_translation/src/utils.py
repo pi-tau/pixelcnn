@@ -136,15 +136,12 @@ def get_data(root, language):
         src_test_sents (List[List[str]]): List of test source sentences.
         tgt_test_sents (List[List[str]]): List of test target sentences.
     """
-    print("Reading training data from %s ..." % root)
     src_train_sents = read_corpus(root + "train.%s" % language, source="src")
     tgt_train_sents = read_corpus(root + "train.en", source="tgt")
 
-    print("Reading development data...")
     src_dev_sents = read_corpus(root + "dev.%s" % language, source="src")
     tgt_dev_sents = read_corpus(root + "dev.en", source="tgt")
 
-    print("Reading test data...")
     src_test_sents = read_corpus(root + "test.%s" % language, source="src")
     tgt_test_sents = read_corpus(root + "test.en", source="tgt")
 
