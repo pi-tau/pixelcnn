@@ -66,10 +66,20 @@ print(f"""
 Training parameters:
     Seed:                     {args.seed}
     Vocab size:               {args.vocab_size}
+    Frequency cutoff:         {args.freq_cutoff}
+    Word embed size:          {args.word_embed_size}
+    Char embed size:          {args.char_embed_size}
+    Hidden size:              {args.hidden_size}
+    Dropout rate:             {args.dropout_rate}
+    Kernel size:              {args.kernel_size}
+    Padding:                  {args.padding}
     Learning rate:            {args.learning_rate}
     Learning rate decay:      {args.lr_decay}
+    Clip grad:                {args.clip_grad}
     Batch size:               {args.batch_size}
     Max Epochs:               {args.max_epochs}
+    Max num trial:            {args.max_num_trial}
+    Patience limit:           {args.patience_limit}
 ##############################\n""", file=stdout)
 
 # Fix the seeds for random number generators.
