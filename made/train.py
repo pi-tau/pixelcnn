@@ -22,6 +22,7 @@ def train(model, train_data, test_data, train_args, verbose=False):
         # Iterate over the training set.
         avg_loss, j = 0., 0
         for x in train_loader:
+            x = x.to(model.device).contiguous()
             logits = model(x)
             loss = F.cross_entropy(logits, x.long(), reduction="mean")
 
@@ -52,6 +53,7 @@ def eval(model, test_loader):
     with torch.no_grad():
         total_loss, i = 0., 0
         for x in test_loader:
+            x = x.to(model.device).contiguous()
             logits = model(x)
             loss = F.cross_entropy(logits, x.long())
             total_loss += loss.item()
