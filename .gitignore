@@ -6,3 +6,6 @@
 
 # Byte-compiled Files
 __pycache__
+
+# Datasets
+dataset
