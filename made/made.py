@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from masked_linear import MaskedLinear
+from mask_linear import MaskLinear
 
 
 class MADE(nn.Module):
@@ -87,18 +87,11 @@ class MADE(nn.Module):
         sizes = [nin] + hidden_sizes
         for i, fan_in, fan_out in zip(range(len(sizes)-1), sizes[:-1], sizes[1:]):
             layers.extend([
-                MaskedLinear(fan_in, fan_out, masks[i]),
+                MaskLinear(fan_in, fan_out, masks[i]),
                 nn.ReLU(),
             ])
-        layers.append(MaskedLinear(fan_out, self.nout, masks[self.num_layers]))
+        layers.append(MaskLinear(fan_out, self.nout, masks[self.num_layers]))
         self.net = nn.Sequential(*layers)
-
-       # Initialize the model parameters.
-        for param in self.parameters():
-            if len(param.shape) >= 2:
-                nn.init.kaiming_uniform_(param)      # weight
-            else:
-                nn.init.uniform_(param, -0.01, 0.01) # bias
 
     def _create_masks(self):
         """This function creates the masks for the weights of the neural network.

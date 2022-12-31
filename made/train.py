@@ -20,7 +20,7 @@ def train(model, train_data, test_data, train_args, verbose=False):
     test_losses.append(eval(model, test_loader))
     for i in tqdm(range(epochs)):
         # Iterate over the training set.
-        avg_loss, i = 0., 0
+        avg_loss, j = 0., 0
         for x in train_loader:
             logits = model(x)
             loss = F.cross_entropy(logits, x.long(), reduction="mean")
@@ -33,15 +33,15 @@ def train(model, train_data, test_data, train_args, verbose=False):
             train_losses.append(loss.item())
 
             avg_loss += loss.item()
-            i += 1
-        avg_loss /= i
+            j += 1
+        avg_loss /= j
 
         # Test on the test set.
         test_losses.append(eval(model, test_loader))
 
         # Maybe printout results.
         if verbose:
-            tqdm.write(f"Epoch {i+1/epochs}:")
+            tqdm.write(f"Epoch {i+1}/{epochs}:")
             tqdm.write(f"  train loss {avg_loss} / test loss {test_losses[-1]}")
 
     return train_losses, test_losses

@@ -14,7 +14,7 @@ training.
 !["Model Architecture"](img/made.png)
 
 The following modules are implemented:
- * `masked_linear.py` implements a simple masked linear layer.
+ * `mask_linear.py` implements a simple masked linear layer.
  * `made.py` implements the *MADE* model
 
 This implementation allows the input to be ordinal or categorical. Categorical
