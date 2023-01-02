@@ -25,12 +25,16 @@ class MADE(nn.Module):
 
     We will impose an ordering on the dimensions of the input and then the output
     of the model will be interpreted as a set of conditional probabilities:
+    ```
         x = [x_0, x_1, ..., x_(D-1)]
         ordering = [0, 1, 2, ..., (D-1)] # natural ordering
         out = [p(x_0), p(x_1 | x_0), ..., p(x_(D-1) | x_(D-2), ..., x_1, x_0)]
+    ```
     The product of the conditional probabilities yields the joint probability of
     the input:
+    ```
         p(x) = p(x_0, x_1, ..., x_(D-1)) = prod p(x_i | x_<i)
+    ```
 
     To impose the auto-regressive property (ordering) the model uses masking:
     each output is reconstructed only from previous inputs given the ordering.
