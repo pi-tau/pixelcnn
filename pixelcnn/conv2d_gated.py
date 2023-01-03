@@ -55,7 +55,7 @@ class GatedConv2d(nn.Module):
         k = kernel_size
 
         # Initialize the convolutional layer for the vertical convolution.
-        # Instead of using a `k x k` masked filter, we will use a `[k//2] x k`
+        # Instead of using a `k x k` masked filter, we will use a `k//2 x k`
         # non-masked rectangular filter and we will apply padding along the top
         # and the left edges of the image. Note that this operation will produce
         # an output of shape (H + k//2, W + k//2), so we need to crop the output
@@ -66,12 +66,11 @@ class GatedConv2d(nn.Module):
         # two convolutions are combined in a single forward pass where we double
         # the number of filters. After forwarding through this layer, the output
         # is split into two chunks and each is passed to the gate unit.
-        k_up = (k + 1) // 2 # round-up integer division
         self.v_conv = nn.Conv2d(
-            in_channels, 2*out_channels, kernel_size=(k_up, k), padding=k_up, **kwargs)
+            in_channels, 2*out_channels, kernel_size=(k//2, k), padding=k//2, **kwargs)
 
         # Initialize the convolutional layer for the horizontal convolution.
-        # Instead of using a `1 x k` masked filter, we could use a `1 x [k//2]`
+        # Instead of using a `1 x k` masked filter, we could use a `1 x k//2`
         # non-masked filter combined with padding and cropping. However, we need
         # to mask the channels of the current pixel appropriately.
         #
@@ -114,7 +113,7 @@ class GatedConv2d(nn.Module):
         # term of the previous layer.
         self.htoh = MaskConv2d("B", out_channels, in_channels, 1, bias=False)
 
-    def forward(self, x):# xv, xh):
+    def forward(self, x):
         """Perform a forward pass through the gated convolutional layer. This
         layer accepts two tensors with the same number of channels and returns
         two tensors corresponding to the outputs of the vertical and the
@@ -135,7 +134,7 @@ class GatedConv2d(nn.Module):
         _, _, H, W = xv.shape
 
         # Vertical convolution stack.
-        vc = self.v_conv(xv)   # shape (B, C, H + k/2, W + k/2) due to padding
+        vc = self.v_conv(xv)   # shape (B, C, H + k//2, W + k//2) due to padding
         vc = vc[:, :, :H, :W]  # crop the spatial dimensions
         vc_1, vc_2 = torch.chunk(vc, chunks=2, dim=1)  # split the feature maps
         v_out = torch.tanh(vc_1) * torch.sigmoid(vc_2) # gated activation
