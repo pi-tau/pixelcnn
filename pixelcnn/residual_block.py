@@ -7,7 +7,7 @@ class ResBlock(nn.Module):
     """ResBlock is a residual block of convolutional layers used in the PixelCNN
     model.
 
-    The input to the block is a tensor of shape (C, H, W), and the output is a
+    The input to the block is a tensor of shape `(C, H, W)`, and the output is a
     tensor of the same shape.
     The block consists of three layers:
         * The first layer is a `1 x 1` convolutional layer and it reduces the
@@ -17,16 +17,16 @@ class ResBlock(nn.Module):
         * The third layer is a `1 x 1` convolutional layer that up-samples back
             the number of channels to `C`.
 
-    Note that the `1 x 1` convolutional layers also need to be masked layer in
+    Note that the `1 x 1` convolutional layers also need to be masked layers in
     order to impose the auto-regressive property along the channel dimension.
     ```
         |-------------|
-        |    ReLU + Conv 1 x 1 mask B
+        |    ReLU + Conv 1 x 1 mask B (C channels)
         |             |
-        |    ReLU + Conv k x k mask B
+        |    ReLU + Conv k x k mask B (C//2 channels)
         |             |
-             ReLU + Conv 1 x 1 mask B
-        X  -----------|
+             ReLU + Conv 1 x 1 mask B (C channels)
+      input ----------|
     ```
     """
 

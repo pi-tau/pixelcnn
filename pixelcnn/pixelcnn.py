@@ -71,8 +71,11 @@ class PixelCNN(nn.Module):
         layers = []
         in_channels = input_shape[0]
         # The kernel size for the first layer is hard-coded to 7, which seems to
-        # work fine for images of size `32 x 32`.
-        layers.append(MaskConv2d("A", in_channels, filters, kernel_size=7))
+        # work fine for images of size `32 x 32`. Note that the first masked
+        # layer, as well as the residual block, are initialized with double the
+        # number of filters. The reason for this is that inside the residual
+        # block the number of filters is halved.
+        layers.append(MaskConv2d("A", in_channels, 2*filters, kernel_size=7))
         for _ in range(n_blocks):
             # The model uses residual blocks of masked convolutional layers.
             # Before every residual block apply normalization along the channel
@@ -83,13 +86,13 @@ class PixelCNN(nn.Module):
             # are divided into three separate groups and each group is normalized
             # separately in order to respect the auto-regressive property.
             layers.extend([
-                PositionalNorm("channels_first", filters // 3),
-                ResBlock(filters, kernel_size),
+                PositionalNorm("channels_first", 2*filters // 3),
+                ResBlock(2*filters, kernel_size),
             ])
         # At the end the model uses two consecutive `1 x 1` convolutional layers
         # with a fixed size. The paper states that the number of filters should
         # be 1024, however we will use a value that is divisible by 3.
-        layers.extend([nn.ReLU(), MaskConv2d("B", filters, out_channels=768, kernel_size=1)])
+        layers.extend([nn.ReLU(), MaskConv2d("B", 2*filters, out_channels=768, kernel_size=1)])
         layers.extend([nn.ReLU(), MaskConv2d("B", 768, self.n_colors * in_channels, 1)])
         self.net = nn.Sequential(*layers)
 
@@ -106,7 +109,8 @@ class PixelCNN(nn.Module):
                 giving the un-normalized logits for each dimension of the input.
         """
         x = x.to(self.device).contiguous().float()
-        batch_size = x.shape[0]
+        B, C, H, W = x.shape
+        d = self.n_colors
 
         # Normalize the input.
         # Note that we are not normalizing the input using the training data
@@ -118,11 +122,16 @@ class PixelCNN(nn.Module):
         # calculated mean and std would need to be passed to the `sample` method
         # as well. Passing the generated raw pixel values would be incorrect as
         # they need to be normalized before forwarding.
-        mean, std = (self.n_colors - 1) / 2, (self.n_colors - 1) / 2
+        mean, std = (d-1)/2, (d-1)/2
         x = (x - mean) / std
-
         logits = self.net(x)
-        logits = logits.view(batch_size, self.n_colors, *self.input_shape)
+
+        # Instead of doing `logits.view(B, d, C, H, W)`, we are first splitting
+        # along the channels. This needs to be done because the last masked
+        # convolution has grouped the logits into `C` groups, depending on their
+        # color channel. Reshaping in the wrong order splits the groups correctly
+        # taking into account the masking.
+        logits = logits.view(B, C, d, H, W).permute(0, 2, 1, 3, 4)
         return logits
 
     @torch.no_grad()

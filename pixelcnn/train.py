@@ -19,7 +19,7 @@ def train(model, train_data, test_data, train_args, verbose=False):
     test_losses.append(eval(model, test_loader))
     for i in tqdm(range(epochs)):
         # Iterate over the training set.
-        avg_loss, j = 0., 0
+        total_loss = 0.
         for x in train_loader:
             logits = model(x)
             labels = x.to(model.device).contiguous().long()
@@ -32,9 +32,8 @@ def train(model, train_data, test_data, train_args, verbose=False):
 
             train_losses.append(loss.item())
 
-            avg_loss += loss.item()
-            j += 1
-        avg_loss /= j
+            total_loss += loss.item() * x.shape[0]
+        avg_loss = total_loss / len(train_loader.dataset)
 
         # Test on the test set.
         test_losses.append(eval(model, test_loader))
@@ -50,14 +49,13 @@ def eval(model, test_loader):
     is_training = model.training
     model.eval()
     with torch.no_grad():
-        total_loss, i = 0., 0
+        total_loss = 0.
         for x in test_loader:
             logits = model(x)
             labels = x.to(model.device).contiguous().long()
             loss = F.cross_entropy(logits, labels, reduction="mean")
-            total_loss += loss.item()
-            i += 1
+            total_loss += loss.item() * x.shape[0]
     if is_training: model.train()
-    return total_loss / i
+    return total_loss / len(test_loader.dataset)
 
 #

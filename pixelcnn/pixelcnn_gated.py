@@ -104,7 +104,8 @@ class GatedPixelCNN(nn.Module):
                 giving the un-normalized logits for each dimension of the input.
         """
         x = x.to(self.device).contiguous().float()
-        batch_size = x.shape[0]
+        B, C, H, W = x.shape
+        d = self.n_colors
 
         # Normalize the input.
         # Note that we are not normalizing the input using the training data
@@ -116,7 +117,7 @@ class GatedPixelCNN(nn.Module):
         # calculated mean and std would need to be passed to the `sample` method
         # as well. Passing the generated raw pixel values would be incorrect as
         # they need to be normalized before forwarding.
-        mean, std = (self.n_colors - 1) / 2, (self.n_colors - 1) / 2
+        mean, std = (d-1)/2, (d-1)/2
         x = (x - mean) / std
 
         x_in = self.in_conv(x)
@@ -129,10 +130,16 @@ class GatedPixelCNN(nn.Module):
             xv = self.v_norm_layers[i](xv)
             xh = self.h_norm_layers[i](xh)
 
-        # We need to redirect the output of the horizontal stack to the output
-        # layers.
+        # We need to redirect only the output of the horizontal stack to the
+        # output layers.
         logits = self.out_conv(xh)
-        logits = logits.view(batch_size, self.n_colors, *self.input_shape)
+
+        # Instead of doing `logits.view(B, d, C, H, W)`, we are first splitting
+        # along the channels. This needs to be done because the last masked
+        # convolution has grouped the logits into `C` groups, depending on their
+        # color channel. Reshaping in the wrong order splits the groups correctly
+        # taking into account the masking.
+        logits = logits.view(B, C, d, H, W).permute(0, 2, 1, 3, 4)
         return logits
 
     @torch.no_grad()
