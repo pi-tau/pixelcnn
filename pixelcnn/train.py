@@ -20,9 +20,9 @@ def train(model, train_data, test_data, train_args, verbose=False):
     for i in tqdm(range(epochs)):
         # Iterate over the training set.
         avg_loss, j = 0., 0
-        for x, y in train_loader:
+        for x in train_loader:
             logits = model(x)
-            labels = y.to(model.device).contiguous().long()
+            labels = x.to(model.device).contiguous().long()
             loss = F.cross_entropy(logits, labels, reduction="mean")
 
             optimizer.zero_grad()
@@ -51,9 +51,9 @@ def eval(model, test_loader):
     model.eval()
     with torch.no_grad():
         total_loss, i = 0., 0
-        for x, y in test_loader:
+        for x in test_loader:
             logits = model(x)
-            labels = y.to(model.device).contiguous().long()
+            labels = x.to(model.device).contiguous().long()
             loss = F.cross_entropy(logits, labels, reduction="mean")
             total_loss += loss.item()
             i += 1

@@ -38,6 +38,8 @@ class GatedPixelCNN(nn.Module):
         self.input_shape = input_shape
         self.n_colors = color_depth
         self.n_blocks = n_blocks
+        self.filters = filters
+        self.kernel_size = kernel_size
 
         # Initialize the architecture of the model.
         # As with the original PixelCNN, here we also use two types of masks:
@@ -94,7 +96,8 @@ class GatedPixelCNN(nn.Module):
         """Perform a forward pass through the network.
 
         Args:
-            x (Tensor): Input tensor of shape (B, C, H, W).
+            x (Tensor): Input tensor of shape (B, C, H, W). Note that the input
+                must be the raw pixel values of the image.
 
         Returns:
             logits (Tensor): Output tensor of shape (B, color_depth, C, H, W)
@@ -102,6 +105,19 @@ class GatedPixelCNN(nn.Module):
         """
         x = x.to(self.device).contiguous().float()
         batch_size = x.shape[0]
+
+        # Normalize the input.
+        # Note that we are not normalizing the input using the training data
+        # statistics. Rather we are using fixed values for the mean and the std.
+        # This is ok, given that we are working with natural images. We expect
+        # the mean color value of the data to be approximately equal to the
+        # mean color.
+        # We could also preprocess the data the usual way, but then the
+        # calculated mean and std would need to be passed to the `sample` method
+        # as well. Passing the generated raw pixel values would be incorrect as
+        # they need to be normalized before forwarding.
+        mean, std = (self.n_colors - 1) / 2, (self.n_colors - 1) / 2
+        x = (x - mean) / std
 
         x_in = self.in_conv(x)
         xv, xh = x_in, x_in
@@ -157,5 +173,27 @@ class GatedPixelCNN(nn.Module):
     def device(self):
         """str: Determine on which device is the model placed upon, CPU or GPU."""
         return next(self.parameters()).device
+
+    @classmethod
+    def load(cls, path):
+        """Load the model from a file."""
+        params = torch.load(path, map_location=lambda storage, loc: storage)
+        kwargs = params["kwargs"]
+        model = cls(**kwargs)
+        model.load_state_dict(params["state_dict"])
+        return model
+
+    def save(self, path):
+        """Save the model to a file."""
+        params = {"kwargs": {
+                "input_shape": self.input_shape,
+                "color_depth": self.n_colors,
+                "n_blocks": self.n_blocks,
+                "filters": self.filters,
+                "kernel_size": self.kernel_size,
+            },
+            "state_dict": self.state_dict()
+        }
+        torch.save(params, path)
 
 #
