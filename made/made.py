@@ -4,7 +4,30 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mask_linear import MaskLinear
+
+class MaskLinear(nn.Linear):
+    """MaskLinear is the same as Linear but applies a mask on the weights."""
+
+    def __init__(self, fan_in, fan_out, mask):
+        """Init a masked Linear layer.
+
+        Args:
+            fan_in: int
+                Number of input units.
+            fan_out: int
+                Number of output units.
+            mask: torch.Tensor
+                Boolean tensor of shape (fan_in, fan_out) defining the mask of the layer.
+        """
+        super().__init__(fan_in, fan_out, bias=True)
+
+        # Note that we are transposing the mask. The reason for this is that
+        # the weight matrix is also stored in transposed form by PyTorch.
+        assert mask.shape == (fan_in, fan_out), "mask dimension must match layer dimensions"
+        self.register_buffer("mask", mask.type(dtype=torch.bool).T)
+
+    def forward(self, x):
+        return F.linear(x, self.mask * self.weight, self.bias)
 
 
 class MADE(nn.Module):
@@ -44,10 +67,6 @@ class MADE(nn.Module):
     we need to zero these connections by multiplying the weights matrix of every
     layer by a binary mask matrix.
 
-    The masks for every layer of the model are constructed in the `_create_masks`
-    method. Afterwards, we initialize the layers of the network as MaskedLinear
-    layers.
-
     This code is inspired by Andrej Karpathy's implementation given here:
     https://github.com/karpathy/pytorch-made
     """
@@ -56,14 +75,19 @@ class MADE(nn.Module):
         """Init MADE network.
 
         Args:
-            input_shape (tuple[int]): The shape of the input tensors.
-            d (int): The number of possible discrete values for each random variable.
-            hidden_sizes (list[int]): A list of sizes for the hidden layers.
-            ordering (list[int]): A list of integers giving an ordering for the
-                dimensions of the input. Default value is None, corresponding to
-                a natural ordering, i.e. [0, 1, ...., (D-1)].
-            one_hot (bool): A boolean flag indicating weather the input should be
-                converted to one-hot encoding.
+            input_shape: list[int]
+                The shape of the input tensors.
+            d: int
+                The number of possible discrete values for each random variable.
+            hidden_sizes: list[int]
+                List of sizes for the hidden layers.
+            ordering: list[int], optional
+                List of integers giving an ordering for the dimensions of the
+                input. Default value is None, corresponding to a natural
+                ordering, i.e. [0, 1, ...., (D-1)].
+            one_hot: bool, optional
+                Boolean flag indicating weather the input should be converted to
+                one-hot encoding.
         """
         super().__init__()
         self.d = d
@@ -81,6 +105,9 @@ class MADE(nn.Module):
         self.nout = d * self.nin
 
         # Create the masks for the Masked Linear layers.
+        # The masks for every layer of the model are constructed in the `_create_masks`
+        # method. Afterwards, we initialize the layers of the network as MaskedLinear
+        # layers.
         self.ordering = torch.arange(self.nin) if ordering is None else torch.IntTensor(ordering)
         self.one_hot = one_hot
         masks = self._create_masks()
@@ -103,9 +130,10 @@ class MADE(nn.Module):
         is respected.
 
         Returns:
-            masks (dict): A dictionary of Tensors representing the mask for each
-                layer of the neural network. Calling `mask[i]` will return the
-                mask Tensor for the i-th layer.
+            masks: dict
+                A dictionary of Tensors representing the mask for each layer of
+                the neural network. Calling `mask[i]` will return the mask
+                Tensor for the i-th layer.
         """
         L = self.num_layers
         masks = [None] * (L + 1)
@@ -159,12 +187,14 @@ class MADE(nn.Module):
         """Perform a forward pass through the network.
 
         Args:
-            x (Tensor): Input tensor of shape (B, d1, d2, ...). Every value of the
-                input tensor must take discrete values from a set of `d` numbers.
+            x: torch.Tensor
+                Tensor of shape (B, d1, d2, ...). Every value of the input
+                tensor must take discrete values from a set of `d` numbers.
 
         Returns:
-            logits (Tensor): Output tensor of shape (B, d, d1, d2, ...) giving
-                the un-normalized logits for each dimension of the input.
+            logits: torch.Tensor
+                Tensor of shape (B, d, d1, d2, ...) giving the un-normalized
+                logits for each dimension of the input.
         """
         x = x.to(self.device).contiguous()
         B = x.shape[0]
@@ -191,11 +221,12 @@ class MADE(nn.Module):
         `p(x_i | x_<i)` and samples from it.
 
         Args:
-            n (int): Number of samples to be generated. Default values is 1.
+            n: int, optional
+                Number of samples to be generated. Default: 1.
 
         Returns:
-            samples (Tensor): A tensor of shape (n, *input_shape) giving the
-                sampled data points generated by the model.
+            samples: torch.Tensor
+                Tensor of shape (n, *input_shape) giving the sampled data points.
         """
         self.inv_ordering = {x.item(): i for i, x in enumerate(self.ordering)}
         samples = torch.zeros(size=(n, self.nin), device=self.device)
@@ -211,5 +242,28 @@ class MADE(nn.Module):
     def device(self):
         """str: Determine on which device is the model placed upon, CPU or GPU."""
         return next(self.parameters()).device
+
+    @classmethod
+    def load(cls, path):
+        """Load the model from a file."""
+        params = torch.load(path, map_location=lambda storage, loc: storage)
+        kwargs = params["kwargs"]
+        model = cls(**kwargs)
+        model.load_state_dict(params["state_dict"])
+        return model
+
+    def save(self, path):
+        """Save the model to a file."""
+        params = {
+            "kwargs": {
+                "input_shape": self.input_shape,
+                "d": self.d,
+                "hidden_sizes": self.hidden_sizes,
+                "ordering": self.ordering.tolist(),
+                "one_hot": self.one_hot,
+            },
+            "state_dict": self.state_dict(),
+        }
+        torch.save(params, path)
 
 #
