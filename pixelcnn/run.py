@@ -7,7 +7,7 @@ import torchvision
 from torchvision.transforms import ToTensor
 from tqdm import tqdm
 
-from pixelcnn_gated import GatedPixelCNN
+from pixelcnn import PixelCNN
 
 
 def train(args):
@@ -31,7 +31,7 @@ def train(args):
     # Initialize the model.
     C, H, W = (3, 32, 32)
     n_colors = 256
-    model = GatedPixelCNN(
+    model = PixelCNN(
         input_shape=(C, H, W), color_depth=n_colors, n_blocks=15, filters=120, kernel_size=3)
     model.to(device)
     model.train()
