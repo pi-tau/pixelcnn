@@ -53,8 +53,6 @@ The following modules are implemented:
 
 ## Training
 Train *PixelCNN* to model the probability distribution of the CIFAR-10 dataset.
-Given a binary image of height $H$ and width $W$, $x \in \\\{0, 1\\\}^{H \times W}$,
-we can represent that image as a flattened binary vector $x \in \\\{0, 1\\\}^{HW}$.
 
 To train the model run:
 ```bash
@@ -83,3 +81,7 @@ imgs = model.sample(n=36)   # img,shape = (36, 3, 32, 32)
 grid = torchvision.utils.make_grid(imgs, nrow=6)
 plt.imshow(grid.permute(1, 2, 0))
 ```
+
+This is what the model generates after training for 50 epochs.
+
+!["Generated images"](img/generated_images.png)
