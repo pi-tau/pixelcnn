@@ -14,11 +14,12 @@ class GatedConv2d(nn.Module):
 
     `vertical convolving filter`
     ```
-        1  1  1  1  1
-        1  1  1  1  1
-        0  0  0  0  0
-        0  0  0  0  0
-        0  0  0  0  0
+            type A                              type B
+        1  1  1  1  1                       1  1  1  1  1
+        1  1  1  1  1                       1  1  1  1  1
+        0  0  0  0  0                       1  1  1  1  1
+        0  0  0  0  0                       0  0  0  0  0
+        0  0  0  0  0                       0  0  0  0  0
     ```
 
     The horizontal filter is a 1D filter that slides along the rows and is
@@ -26,13 +27,16 @@ class GatedConv2d(nn.Module):
 
     `horizontal convolving filter`
     ```
-        1  1  *?* 0  0
+            type A                              type B
+        1  1  0  0  0                       1  1  1  0  0
     ```
 
-    Depending on whether we want to mask the mid point of the horizontal filter
-    or not we have two types of gated conv2d layers:
-        * type A will mask the mid point
-        * type B will not mask the mid point
+    Again we have two types of layers depending on the masking patter that we
+    want to apply:
+        * type A - mask the vertical filter to exclude the current row; mask the
+          horizontal filter to exclude the current pixel
+        * type B - mask the vertical filter to include the current row; mask the
+          horizontal filter to include the current pixel
 
     The output of the two filters is then combined and a gated unit is applied
     as a non-linearity function.
@@ -42,24 +46,33 @@ class GatedConv2d(nn.Module):
         """Init a gated Conv 2D layer.
 
         Args:
-            mask_type (str): The type of the mask (type "A" or type "B").
-            in_channels (int): Number of channels in the input image.
-            out_channels (int): Number of channels produced by the convolution.
-            kernel_size (int or tuple(int, int)): The size of the convolving kernel.
-            kwargs (dict): A dictionary with additional configuration parameters
-                used for initializing a standard `nn.Conv2d` layer. If padding
-                is provided it will be ignored.
+            mask_type: str
+                The type of the mask (type "A" or type "B").
+            in_channels: int
+                Number of channels in the input image.
+            out_channels: int
+                Number of channels produced by the convolution.
+            kernel_size: int or tuple(int, int)
+                The size of the convolving kernel.
+            kwargs: dict
+                Dictionary with additional configuration parameters used for
+                initializing a standard `nn.Conv2d` layer. If padding is
+                provided it will be ignored.
         """
         super().__init__()
         assert mask_type == "A" or mask_type == "B", "unknown mask type"
         k = kernel_size
+        s = 0 if mask_type == "A" else 1 # else mask_type = "B"
 
         # Initialize the convolutional layer for the vertical convolution.
         # Instead of using a `k x k` masked filter, we will use a `k//2 x k`
-        # non-masked rectangular filter and we will apply padding along the top
-        # and the left edges of the image. Note that this operation will produce
-        # an output of shape (H + k//2, W + k//2), so we need to crop the output
+        # non-masked rectangular filter and we will apply padding of size `k//2`
+        # along all the edges of the image. Note that this operation will produce
+        # an output of shape (H + k, W), so we need to crop the output
         # afterwards. No masking is needed as we are convolving the rows above.
+        #
+        # In order to implement a type B layer we will simply enlarge the size
+        # of the kernel to `k//2 + 1 x k`.
         #
         # We need two separate convolutions in order to pass the results through
         # the gated unit at the end. In order to increase parallelization, these
@@ -67,7 +80,7 @@ class GatedConv2d(nn.Module):
         # the number of filters. After forwarding through this layer, the output
         # is split into two chunks and each is passed to the gate unit.
         self.v_conv = nn.Conv2d(
-            in_channels, 2*out_channels, kernel_size=(k//2, k), padding=k//2, **kwargs)
+            in_channels, 2*out_channels, kernel_size=(k//2+s, k), padding=k//2, **kwargs)
 
         # Initialize the convolutional layer for the horizontal convolution.
         # Instead of using a `1 x k` masked filter, we could use a `1 x k//2`
@@ -120,22 +133,24 @@ class GatedConv2d(nn.Module):
         horizontal convolution.
 
         Args:
-            x (tuple(Tensor, Tensor)): A tuple of two tensors of the same shape
-                (B, C, H, W). The first tensor will be the input to the vertical
-                convolution and the second - to the horizontal convolution.
+            x: tuple(torch.Tensor, torch.Tensor)
+                Tuple of two tensors of the same shape (B, C, H, W). The first
+                tensor will be the input to the vertical convolution and the
+                second - to the horizontal convolution.
 
         Returns:
-            out (tuple(Tensor, Tensor)): A tuple of two tensors. The first tensor
-                is of shape (B, Cv, H, W), giving the output of the vertical
-                convolution. The second tensor is of shape (B, C, H, W), giving
-                the output of the horizontal convolution.
+            out: tuple(torch.Tensor, torch.Tensor)
+                Tuple of two tensors. The first tensor is of shape (B, Cv, H, W),
+                giving the output of the vertical convolution. The second tensor
+                is of shape (B, C, H, W), giving the output of the horizontal
+                convolution.
         """
         xv, xh = x
-        _, _, H, W = xv.shape
+        _, _, H, _ = xv.shape
 
         # Vertical convolution stack.
-        vc = self.v_conv(xv)   # shape (B, C, H + k//2, W + k//2) due to padding
-        vc = vc[:, :, :H, :W]  # crop the spatial dimensions
+        vc = self.v_conv(xv)    # shape (B, C, H + k, W) due to padding
+        vc = vc[:, :, :H, :]    # crop the spatial dimensions
         vc_1, vc_2 = torch.chunk(vc, chunks=2, dim=1)  # split the feature maps
         v_out = torch.tanh(vc_1) * torch.sigmoid(vc_2) # gated activation
 

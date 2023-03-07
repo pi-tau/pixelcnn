@@ -39,8 +39,9 @@ class PositionalNorm(nn.LayerNorm):
         """Init a positional normalization layer.
 
         Args:
-            data_format (str): Specifies the format of the input data. Must be
-                one of ["channels_last", "channels_first"].
+            data_format: str
+                Specifies the format of the input data. Must be one of
+                ["channels_last", "channels_first"].
             *args, **kwargs: Additional configuration parameters used for
                 initializing a standard `nn.LayerNorm` layer.
         """
@@ -54,7 +55,8 @@ class PositionalNorm(nn.LayerNorm):
         """Perform a forward pass through the positional normalization layer.
 
         Args:
-            x (Tensor): Input tensor of shape (B, C, H, W) or (B, H, W, C).
+            x: torch.Tensor
+                Input tensor of shape (B, C, H, W) or (B, H, W, C).
         """
         if self.data_format == "channels_last":
             # The input is of shape (B, H, W, C). Separate the channels into

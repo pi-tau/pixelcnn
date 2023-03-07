@@ -39,13 +39,18 @@ class MaskConv2d(nn.Conv2d):
         """Init a masked Conv 2D layer.
 
         Args:
-            mask_type (str): The type of the mask (type "A" or type "B").
-            in_channels (int): Number of channels in the input image.
-            out_channels (int): Number of channels produced by the convolution.
-            kernel_size (int or tuple(int, int)): The size of the convolving kernel.
-            kwargs (dict): A dictionary with additional configuration parameters
-                used for initializing a standard `nn.Conv2d` layer. If padding
-                is provided it will be ignored.
+            mask_type: str
+                The type of the mask (type "A" or type "B").
+            in_channels: int
+                Number of channels in the input image.
+            out_channels: int
+                Number of channels produced by the convolution.
+            kernel_size: int or tuple(int, int)
+                The size of the convolving kernel.
+            kwargs: dict
+                Dictionary with additional configuration parameters used for
+                initializing a standard `nn.Conv2d` layer. If padding is provided
+                it will be ignored.
         """
         kwargs["padding"] = "same" # ignore user specified padding
         super().__init__(in_channels, out_channels, kernel_size, **kwargs)
@@ -56,7 +61,7 @@ class MaskConv2d(nn.Conv2d):
 
         # Mask the contribution of future pixels. Allow only previous pixels
         # to be used as context.
-        mask = torch.ones_like(self.weight) # (out_channels, in_channels, kv, kh)
+        mask = torch.ones_like(self.weight)   # (out_channels, in_channels, kv, kh)
         mask[:, :, kv // 2, kh // 2 + 1:] = 0 # mask the weights at mid row after mid point
         mask[:, :, kv // 2 + 1:, :] = 0       # mask the weights below mid row
 
