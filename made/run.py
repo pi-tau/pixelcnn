@@ -52,7 +52,8 @@ def train(args):
 
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
+            if args.clip_grad is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
             optimizer.step()
 
             train_losses.append(loss.item())
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=3e-4, type=float)
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--batch_size", default=128, type=int)
-    parser.add_argument("--clip_grad", default=10.0, type=float)
+    parser.add_argument("--clip_grad", default=None, type=float)
     parser.add_argument("--verbose", action="store_true", default=False)
     args = parser.parse_args()
 

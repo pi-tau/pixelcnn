@@ -19,7 +19,7 @@ we can represent that image as a flattened binary vector $x \in \\\{0, 1\\\}^{HW
 
 To train the model run:
 ```bash
-python3 run.py --seed=0 --lr=3e-5 --epochs=500 --verbose
+python3 run.py --seed=0 --lr=3e-4 --epochs=350 --verbose
 ```
 
 The script will download the MNIST dataset into a `datasets` folder and will
@@ -30,7 +30,7 @@ train the model on it. The trained model parameters will be saved to the file
 ## Generation
 To use the trained model for generating MNIST images run the following:
 ```python
-model = MADE.load("made.pt")
+model = torch.load("made.pt")
 img = model.sample()        # img,shape = (1, 1, 28, 28)
 plt.imshow(img[0].permute(1, 2, 0))
 ```
@@ -39,12 +39,12 @@ number of dimensions.
 
 To speed things up you could generate multiple images at once:
 ```python
-model = MADE.load("made.pt")
+model = torch.load("made.pt")
 imgs = model.sample(n=36)   # img,shape = (36, 1, 28, 28)
 grid = torchvision.utils.make_grid(imgs, nrow=6)
 plt.imshow(grid.permute(1, 2, 0))
 ```
 
-This is what the model generates after training for 500 epochs.
+This is what the model generates after training for 350 epochs.
 
 !["Generated images"](img/generated_images.png)

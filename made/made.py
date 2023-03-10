@@ -230,12 +230,9 @@ class MADE(nn.Module):
         log_prob = -F.cross_entropy(logits, x.long(), reduction="none")
         return log_prob
 
+    @torch.no_grad()
     def sample(self, n=1):
         """Generate samples using the network model.
-        In order to generate samples the model has to perform one forward pass
-        per input dimension, i.e. we need to perform `self.nin` forward passes.
-        On the i-th forward pass the model calculates the conditional probability
-        `p(x_i | x_<i)` and samples from it.
 
         Args:
             n: int, optional
@@ -247,11 +244,15 @@ class MADE(nn.Module):
         """
         self.inv_ordering = {x.item(): i for i, x in enumerate(self.ordering)}
         samples = torch.zeros(size=(n, self.nin), device=self.device)
-        with torch.no_grad():
-            for i in tqdm(range(self.nin), desc="Variables generated"):
-                logits = self(samples).view(n, self.d, self.nin)[:, :, self.inv_ordering[i]]
-                probs = F.softmax(logits, dim=1)
-                samples[:, self.inv_ordering[i]] = torch.multinomial(probs, 1).squeeze(-1)
+
+        # In order to generate samples the model has to perform one forward pass
+        # per input dimension, i.e. we need to perform `self.nin` forward passes.
+        # On the i-th forward pass the model calculates the conditional
+        # probability `p(x_i | x_<i)` and samples from it.
+        for i in tqdm(range(self.nin), desc="Variables generated"):
+            logits = self(samples).view(n, self.d, self.nin)[:, :, self.inv_ordering[i]]
+            probs = F.softmax(logits, dim=1)
+            samples[:, self.inv_ordering[i]] = torch.multinomial(probs, 1).squeeze(-1)
         samples = samples.view(n, *self.input_shape)
         return samples.cpu()
 
