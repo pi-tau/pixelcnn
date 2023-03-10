@@ -35,7 +35,19 @@ In order to fix the "blind spot" issue we need to implement two types of layers:
     horizontal filter to include the current pixel
 The first gated layer will be of type A and every other gated layer will be of
 type B. The "blind spot" issue as well as the fix provided by the gated layer
-are can be seen by plotting the receptive field of an arbitrary pixel.
+can be seen by plotting the receptive field of an arbitrary pixel.
+
+```python
+x = torch.ones(size=(1, C, H, W))
+x.requires_grad = True
+m, k = H // 2, W // 2
+out = model(x)                # shape B, d, C, H, W
+out[0, 0, 0, m, k].backward() # bag-prop the mid value
+grad = x.grad.detach().cpu().numpy()[0][1]      # predict Green observing Red channels)
+grad = (np.abs(grad) > 1e-8).astype(np.float32) # 0 if no connection, 1 if connected
+grad[m, k] = 0.33 # mark the current pixel
+plt.imshow(grad)  # plot the receptive field
+```
 
 !["Receptive field"](img/receptive_field.png)
 
@@ -67,7 +79,7 @@ train the model on it. The trained model parameters will be saved to the file
 ## Generation
 To use the trained model for generating CIFAR-10 images run the following:
 ```python
-model = PixelCNN.load("pixelcnn.pt")
+model = torch.load("pixelcnn.pt")
 img = model.sample()        # img,shape = (1, 3, 32, 32)
 plt.imshow(img[0].permute(1, 2, 0))
 ```
@@ -76,8 +88,8 @@ number of dimensions.
 
 To speed things up you could generate multiple images at once:
 ```python
-model = PixelCNN.load("pixelcnn.pt")
-imgs = model.sample(n=36)   # img,shape = (36, 3, 32, 32)
+model = torch.load("pixelcnn.pt")
+imgs = model.sample(n=36)  # img,shape = (36, 3, 32, 32)
 grid = torchvision.utils.make_grid(imgs, nrow=6)
 plt.imshow(grid.permute(1, 2, 0))
 ```
