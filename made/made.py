@@ -3,6 +3,7 @@ from math import prod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 class MaskLinear(nn.Linear):
@@ -188,15 +189,15 @@ class MADE(nn.Module):
 
         Args:
             x: torch.Tensor
-                Tensor of shape (B, d1, d2, ...). Every value of the input
-                tensor must take discrete values from a set of `d` numbers.
+                Tensor of shape (B, D). Every value of the input tensor must
+                take discrete values from a set of `d` numbers.
 
         Returns:
             logits: torch.Tensor
-                Tensor of shape (B, d, d1, d2, ...) giving the un-normalized
-                logits for each dimension of the input.
+                Tensor of shape (B, d, D) giving the un-normalized logits for
+                each dimension of the input.
         """
-        x = x.to(self.device).contiguous()
+        x = x.to(self.device).contiguous().float()
         B = x.shape[0]
 
         if self.one_hot:
@@ -212,6 +213,22 @@ class MADE(nn.Module):
         logits = logits.permute(0, 2, 1).contiguous().view(B, self.d, *self.input_shape)
 
         return logits
+
+    def log_prob(self, x):
+        """Compute the conditional log probabilities for each dimension of the input.
+
+        Args:
+            x: torch.Tensor
+                Tensor of shape (B, d). Every value of the input tensor must
+                take discrete values from a set of `d` numbers.
+            log_prob: torch.Tensor
+                Tensor of shape (B, d) giving the log probability of each
+                dimension conditioned on the previous dimensions.
+        """
+        x = x.to(self.device).contiguous().float()
+        logits = self.forward(x)
+        log_prob = -F.cross_entropy(logits, x.long(), reduction="none")
+        return log_prob
 
     def sample(self, n=1):
         """Generate samples using the network model.
@@ -231,39 +248,16 @@ class MADE(nn.Module):
         self.inv_ordering = {x.item(): i for i, x in enumerate(self.ordering)}
         samples = torch.zeros(size=(n, self.nin), device=self.device)
         with torch.no_grad():
-            for i in range(self.nin):
+            for i in tqdm(range(self.nin), desc="Variables generated"):
                 logits = self(samples).view(n, self.d, self.nin)[:, :, self.inv_ordering[i]]
                 probs = F.softmax(logits, dim=1)
                 samples[:, self.inv_ordering[i]] = torch.multinomial(probs, 1).squeeze(-1)
         samples = samples.view(n, *self.input_shape)
-        return samples
+        return samples.cpu()
 
     @property
     def device(self):
         """str: Determine on which device is the model placed upon, CPU or GPU."""
         return next(self.parameters()).device
-
-    @classmethod
-    def load(cls, path):
-        """Load the model from a file."""
-        params = torch.load(path, map_location=lambda storage, loc: storage)
-        kwargs = params["kwargs"]
-        model = cls(**kwargs)
-        model.load_state_dict(params["state_dict"])
-        return model
-
-    def save(self, path):
-        """Save the model to a file."""
-        params = {
-            "kwargs": {
-                "input_shape": self.input_shape,
-                "d": self.d,
-                "hidden_sizes": self.hidden_sizes,
-                "ordering": self.ordering.tolist(),
-                "one_hot": self.one_hot,
-            },
-            "state_dict": self.state_dict(),
-        }
-        torch.save(params, path)
 
 #

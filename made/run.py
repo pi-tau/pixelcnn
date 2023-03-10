@@ -25,7 +25,6 @@ def train(args):
         transforms.ToTensor(),
         transforms.Lambda(lambda x: (x > 0.5).to(torch.uint8)), # binarize the dataset.
     ])
-
     train_data = torchvision.datasets.MNIST(
         "datasets", train=True, download=True, transform=transform)
     test_data = torchvision.datasets.MNIST(
@@ -35,7 +34,7 @@ def train(args):
 
     # Initialize the model.
     C, H, W = (1, 28, 28)
-    model = MADE(input_shape=(C, H, W), d=2, hidden_sizes=[512, 512], one_hot=False)
+    model = MADE(input_shape=(C, H, W), d=2, hidden_sizes=[512, 512, 512], one_hot=False)
     model.to(device)
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -48,13 +47,12 @@ def train(args):
 
         # Iterate over the training set. Note that we don't need the labels.
         for x, _ in train_loader:
-            x = x.to(model.device).contiguous()
-            logits = model(x)
-            loss = F.cross_entropy(logits, x.long(), reduction="mean")
+            log_prob = model.log_prob(x)
+            loss = -log_prob.mean()
 
             optimizer.zero_grad()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
             optimizer.step()
 
             train_losses.append(loss.item())
@@ -71,7 +69,7 @@ def train(args):
             tqdm.write(f"Epoch ({i+1}/{args.epochs}): "+
                 f"train loss {avg_loss:.5f} / test loss {test_losses[-1]:.5f}")
 
-    model.save("made.pt")
+    torch.save(model, "made.pt")
     return train_losses, test_losses
 
 
@@ -81,9 +79,8 @@ def eval(model, test_loader):
     with torch.no_grad():
         total_loss, i = 0., 0
         for x, _ in test_loader:
-            x = x.to(model.device).contiguous()
-            logits = model(x)
-            loss = F.cross_entropy(logits, x.long())
+            log_prob = model.log_prob(x)
+            loss = -log_prob.mean()
             total_loss += loss.item()
             i += 1
     if is_training: model.train()
