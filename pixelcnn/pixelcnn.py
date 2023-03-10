@@ -27,17 +27,15 @@ class PixelCNN(nn.Module):
     and, thus, it might be reasonable to also keep the channels constant.
     """
 
-    def __init__(self, input_shape, color_depth, n_blocks, filters, kernel_size):
+    def __init__(self, in_shape, n_colors, n_blocks, filters, kernel_size):
         """Init GatedPixelCNN network.
 
         Args:
-            input_shape: list[int]
+            in_shape: tuple(int)
                 The shape of the input tensors. Images should be reshaped
                 channels first, i.e. input_shape = (C, H ,W).
-            color_depth: int
-                The color depth per channel of the image. Given a 24-bit RGB
-                image with 8 bits per color means that we have a color depth of
-                `256` for every one of the three colors.
+            n_colors: int
+                Number of colors per channel of the image.
             n_blocks: int
                 Number of gated convolutional blocks in the network.
             filters: int
@@ -47,8 +45,8 @@ class PixelCNN(nn.Module):
                 The size of a the kernel to be used for all convolutional layers.
         """
         super().__init__()
-        self.input_shape = input_shape
-        self.n_colors = color_depth
+        self.in_shape = in_shape
+        self.n_colors = n_colors
         self.n_blocks = n_blocks
         self.filters = filters
         self.kernel_size = kernel_size
@@ -64,7 +62,7 @@ class PixelCNN(nn.Module):
         # as the input.
         # The kernel size for the first layer is hard-coded to 7, which seems to
         # work fine for images of size `32 x 32`.
-        in_channels = input_shape[0]
+        in_channels = in_shape[0]
         self.in_conv = nn.Sequential(
             MaskConv2d("A", in_channels, filters, kernel_size=7),
             nn.ReLU(),
@@ -117,7 +115,7 @@ class PixelCNN(nn.Module):
 
         Returns:
             logits: torch.Tensor
-                Tensor of shape (B, color_depth, C, H, W) giving the un-normalized
+                Tensor of shape (B, n_colors, C, H, W) giving the un-normalized
                 logits for each dimension of the input.
         """
         x = x.to(self.device).contiguous().float()
@@ -178,10 +176,6 @@ class PixelCNN(nn.Module):
     @torch.no_grad()
     def sample(self, n=1):
         """Generate samples using the network model.
-        In order to generate samples the model has to perform one forward pass
-        per input dimension, i.e. we need to perform `C x H x W` forward passes.
-        We will use three nested for-loops in order to generate the image
-        pixel-by-pixel and channel-by-channel.
 
         Args:
             n: int, optional
@@ -191,11 +185,12 @@ class PixelCNN(nn.Module):
             samples: torch.Tensor
                 Int tensor of shape (n, C, H, W), giving the sampled data points.
         """
-        x_in = torch.zeros(size=(n,)+self.input_shape, device=self.device)
-
         C, H, W = self.input_shape
+        x_in = torch.zeros(size=(n, C, H, W), device=self.device)
         pbar = tqdm(total=C*H*W, desc="Pixels generated") # Display a progress bar during generation.
 
+        # In order to generate samples the model has to perform one forward pass
+        # per input dimension, i.e. we need to perform `C x H x W` forward passes.
         # We are generating the image row-by-row from top to bottom.
         for h in range(H):
             for w in range(W):
