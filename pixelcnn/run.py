@@ -1,10 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch.utils.data as data
 import torchvision
-from torchvision.transforms import ToTensor
+from torchvision.transforms import PILToTensor
 from tqdm import tqdm
 
 from pixelcnn import PixelCNN
@@ -21,40 +20,43 @@ def train(args):
         torch.backends.cudnn.deterministic = True
 
     # Create a dataloader for the CIFAR-10 dataset.
-    train_data = torchvision.datasets.CIFAR10(
-        "datasets", train=True, download=True, transform=ToTensor())
-    test_data = torchvision.datasets.CIFAR10(
-        "datasets", train=False, download=True, transform=ToTensor())
-    train_loader = data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-    test_loader = data.DataLoader(test_data, batch_size=args.batch_size)
+    train_set = torchvision.datasets.CIFAR10(
+        "datasets", train=True, download=True, transform=PILToTensor())
+    test_set = torchvision.datasets.CIFAR10(
+        "datasets", train=False, download=True, transform=PILToTensor())
+    train_loader = data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+    test_loader = data.DataLoader(test_set, batch_size=args.batch_size)
 
     # Initialize the model.
-    C, H, W = (3, 32, 32)
+    _, H, W, C = train_set.data.shape
     n_colors = 256
     model = PixelCNN(
-        input_shape=(C, H, W), color_depth=n_colors, n_blocks=15, filters=120, kernel_size=3)
+        input_shape=(C, H, W),
+        color_depth=n_colors,
+        n_blocks=15,
+        filters=120,
+        kernel_size=3,
+    )
     model.to(device)
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # Run the training loop.
     train_losses, test_losses = [], []
-    test_losses.append(eval(model, test_loader))
     for i in tqdm(range(args.epochs)):
         avg_loss, j = 0., 0
 
         # Iterate over the training set. Note that we don't need the labels.
         for x, _ in train_loader:
-            x = x.to(model.device).contiguous()
-            logits = model(x)
-            loss = F.cross_entropy(logits, x.long(), reduction="mean")
+            log_prob = model.log_prob(x)
+            loss = -log_prob.mean()
 
             optimizer.zero_grad()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
             optimizer.step()
 
-            train_losses.append(loss.item())
+            train_losses.append(avg_loss)
             avg_loss += loss.item()
             j += 1
 
@@ -68,7 +70,8 @@ def train(args):
             tqdm.write(f"Epoch ({i+1}/{args.epochs}): "+
                 f"train loss {avg_loss:.5f} / test loss {test_losses[-1]:.5f}")
 
-    model.save("pixelcnn.pt")
+    # Save the trained model to file.
+    torch.save(model, "pixelcnn.pt")
     return train_losses, test_losses
 
 
@@ -78,9 +81,8 @@ def eval(model, test_loader):
     with torch.no_grad():
         total_loss, i = 0., 0
         for x, _ in test_loader:
-            x = x.to(model.device).contiguous()
-            logits = model(x)
-            loss = F.cross_entropy(logits, x.long())
+            log_prob = model.log_prob(x)
+            loss = -log_prob.mean()
             total_loss += loss.item()
             i += 1
     if is_training: model.train()

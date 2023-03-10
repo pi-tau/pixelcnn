@@ -1,8 +1,7 @@
-import itertools
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from conv2d_gated import GatedConv2d
 from conv2d_mask import MaskConv2d
@@ -108,7 +107,8 @@ class PixelCNN(nn.Module):
         )
 
     def forward(self, x):
-        """Perform a forward pass through the network.
+        """Perform a forward pass through the network to compute the logits
+        for each pixel.
 
         Args:
             x: torch.Tensor
@@ -159,6 +159,22 @@ class PixelCNN(nn.Module):
         logits = logits.view(B, C, d, H, W).permute(0, 2, 1, 3, 4)
         return logits
 
+    def log_prob(self, x):
+        """Compute the conditional log probabilities for each pixel.
+
+        Args:
+            x: torch.Tensor
+                Tensor of shape (B, C, H, W). Note that the input must be the
+                raw pixel values of the image.
+            log_prob: torch.Tensor
+                Tensor of shape (B, C, H, W) giving the log probability of each
+                pixel conditioned on the previous pixels.
+        """
+        x = x.to(self.device).contiguous().float()
+        logits = self.forward(x)
+        log_prob = -F.cross_entropy(logits, x.long(), reduction="none")
+        return log_prob
+
     @torch.no_grad()
     def sample(self, n=1):
         """Generate samples using the network model.
@@ -173,11 +189,13 @@ class PixelCNN(nn.Module):
 
         Returns:
             samples: torch.Tensor
-                Tensor of shape (n, C, H, W), giving the sampled data points.
+                Int tensor of shape (n, C, H, W), giving the sampled data points.
         """
         x_in = torch.zeros(size=(n,)+self.input_shape, device=self.device)
 
         C, H, W = self.input_shape
+        pbar = tqdm(total=C*H*W, desc="Pixels generated") # Display a progress bar during generation.
+
         # We are generating the image row-by-row from top to bottom.
         for h in range(H):
             for w in range(W):
@@ -192,34 +210,15 @@ class PixelCNN(nn.Module):
                     vals = torch.multinomial(probs, 1).squeeze(dim=-1)
                     x_in[:, c, h, w] = vals
 
-        return x_in
+                    # Update the progress bar.
+                    pbar.update()
+
+        pbar.close()
+        return x_in.int().cpu()
 
     @property
     def device(self):
         """str: Determine on which device is the model placed upon, CPU or GPU."""
         return next(self.parameters()).device
-
-    @classmethod
-    def load(cls, path):
-        """Load the model from a file."""
-        params = torch.load(path, map_location=lambda storage, loc: storage)
-        kwargs = params["kwargs"]
-        model = cls(**kwargs)
-        model.load_state_dict(params["state_dict"])
-        return model
-
-    def save(self, path):
-        """Save the model to a file."""
-        params = {
-            "kwargs": {
-                "input_shape": self.input_shape,
-                "color_depth": self.n_colors,
-                "n_blocks": self.n_blocks,
-                "filters": self.filters,
-                "kernel_size": self.kernel_size,
-            },
-            "state_dict": self.state_dict(),
-        }
-        torch.save(params, path)
 
 #
