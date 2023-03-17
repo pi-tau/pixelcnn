@@ -205,7 +205,7 @@ class SqueezeFlow(nn.Module):
             # what the original implementation does. They reshape by pushing the
             # spatial dimensions after the channel dimension, thus achieving an
             # intermixing between the two. Official implementation here:
-            # https://github.com/tensorflow/models/blob/1345ec9bb110ec1173f7558d3d700a5a42ae2b2f/research/real_nvp/real_nvp_utils.py#L213
+            # https://github.com/tensorflow/models/blob/36101ab4095065a4196ff4f6437e94f0d91df4e9/research/real_nvp/real_nvp_utils.py#L213
             # (link might not work tho, official impl was removed and I dug it up in the commit history)
             z = x_in.reshape(B, C, H//2, 2, W//2, 2)
             z = z.permute(0, 3, 5, 1, 2, 4)

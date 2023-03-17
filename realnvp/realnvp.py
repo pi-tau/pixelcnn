@@ -67,6 +67,7 @@ class RealNVP(nn.Module):
                 # At this point the original implementation performs unsqueeze
                 # and then a so-called "factor_out" which is basically the same
                 # as squeeze but arranges the spatial dimensions differently.
+                # https://github.com/tensorflow/models/blob/36101ab4095065a4196ff4f6437e94f0d91df4e9/research/real_nvp/real_nvp_multiscale_dataset.py#L734
                 # Maybe it's not a big deal if we skip both...
             SplitFlow(prior),
             AffineCoupling(make_net(2*C),  checkerboard(H//2, W//2)),
