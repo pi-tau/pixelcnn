@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.utils.data as data
-import torchvision
 import torchvision.transforms as tt
 from torchvision.datasets import CelebA, CIFAR10
 from tqdm import tqdm
@@ -67,7 +66,7 @@ def train(args):
         for x, _ in train_loader:
             # Forward pass.
             log_prob = model.log_prob(x)
-            loss = -torch.mean(log_prob) / (C * H * W) # divide by the number of dims to improve training
+            loss = -torch.mean(log_prob) / (C * H * W) # divide by the number of dims to get nits-per-dim
 
             # Backward pass.
             optimizer.zero_grad()
@@ -75,6 +74,9 @@ def train(args):
             total_norm = torch.norm(torch.stack([torch.norm(p.grad) for p in model.parameters()]))
             if args.clip_grad is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
+                # Maybe clip gradients of each flow network separately?
+                # for flow in model.flow.flows:
+                #     torch.nn.utils.clip_grad_norm_(flow.parameters(), args.clip_grad)
             optimizer.step()
 
             total_norms.append(total_norm.item())
@@ -128,33 +130,6 @@ def plot(figname, train_losses, test_losses):
     plt.close(fig)
 
 
-def plot_samples(dataset_name):
-    model_path = f"realnvp_{dataset_name}.pt"
-    fig_path = f"generated_images_{dataset_name}.png"
-
-    model = torch.load(model_path, map_location=torch.device("cuda"))
-    imgs = model.sample(n=36)     # img,shape = (36, 3, 32, 32)
-    grid = torchvision.utils.make_grid(imgs, nrow=6)
-
-    fig, ax = plt.subplots(figsize=(4.8, 4.8), tight_layout={"pad":0})
-    ax.axis("off")
-    ax.imshow(grid.permute(1, 2, 0))
-    fig.savefig(fig_path)
-
-
-def plot_total_norm(figname, total_norms):
-    n_epochs = len(test_losses) - 1
-    xs_train = np.linspace(0, n_epochs, len(train_losses))
-
-    fig, ax = plt.subplots()
-    ax.set_title("Total grad norm during training")
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Grad norm")
-    ax.plot(xs_train, total_norms, lw=0.6)
-    fig.savefig(figname)
-    plt.close(fig)
-
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -170,7 +145,5 @@ if __name__ == "__main__":
 
     train_losses, test_losses, total_norms = train(args)
     plot(f"loss_{args.dataset}.png", train_losses, test_losses)
-    plot_total_norm(f"total_norm_{args.dataset}.png", total_norms)
-    plot_samples(args.dataset)
 
 #

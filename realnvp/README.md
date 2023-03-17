@@ -29,7 +29,7 @@ $argmin_\theta \space \mathbb{E}[-\log p_\theta]$.
 However, our model is giving us a function $f_\theta$ that maps $p_\theta$ to
 $p_Z$, so to compute $p_\theta$ from there we get:
 
-$\displaystyle p_\theta(x) = p_z(f_\theta(x)) | \det \frac{\partial f_\theta(x)}{\partial x}|$
+$\displaystyle p_\theta(x) = p_Z(f_\theta(x)) | \det \frac{\partial f_\theta(x)}{\partial x}|$
 
 $\log p_\theta(x) = \log p_Z (f_\theta(x)) + \log \det J$
 
@@ -44,7 +44,9 @@ that allows $\log \det J$ to be easy to compute.
 1. The simplest idea would be to have our flow model act independently over
 different dimensions of the input:
 
-$z = f_\theta(\vec x) = f_\theta((x_1, x_2, \dots, x_d)) = (f_\theta(x_1), f_\theta(x_2), \dots, f_\theta(x_d))$,
+$z = f_\theta(\vec x) = f_\theta((x_1, x_2, \dots, x_d))$
+
+$z = (f_\theta(x_1), f_\theta(x_2), \dots, f_\theta(x_d))$,
 
 where $f_\theta$ is any invertible function.
 In this case the Jacobian is a diagonal matrix and the determinant is simply the
@@ -106,7 +108,7 @@ $z = f_\theta(x) = f_k \circ \cdots \circ f_1 (x)$
 
 The log probability then becomes:
 
-$\displaystyle \log p_\theta(x) = \log p_z(f_\theta(x)) + \sum_{i=1}^{k} | \det \frac{\partial f_i}{\partial f_{i-1}}|$
+$\displaystyle \log p_\theta(x) = \log p_Z(f_\theta(x)) + \sum_{i=1}^{k} | \det \frac{\partial f_i}{\partial f_{i-1}}|$
 
 #### Multi-scale architecture
 To reduce the computational cost of large models composed of multiple flows we
@@ -120,43 +122,45 @@ multiple splitsDepending on the size of the input and the number of flows.
 
 ## Training
 Hyper-parameters for training the model on two different datasets are provided:
-    * CIFAR-10
-    * CelebA cropped to 32x32
+* CIFAR10
+* CelebA cropped to 32x32
 
 To train the model run:
 ```bash
-python3 run.py --seed 0 --lr 3e-4 --epochs 100 --dataset CelebA
+python3 run.py --seed 0 --lr 3e-4 --epochs 50 --dataset CelebA
 ```
 ```bash
-python3 run.py --seed 0 --lr 3e-4 --epochs 100 --dataset CIFAR10
+python3 run.py --seed 0 --lr 3e-4 --epochs 350 --dataset CIFAR10
 ```
 
 The script will download the corresponding dataset into a `datasets` folder and
 will train the model on it. The trained model parameters will be saved to the file
 `realnvp_<DATASET>.pt`.
 
-<!--
+
 ## Generation
 To use the trained model for generating CelebA images run the following:
 ```python
-model = torch.load("realnvp_CelebA.pt", map_location: torch.device("cuda"))
+model = torch.load("realnvp_CelebA.pt")
 imgs = model.sample(n=36)  # img,shape = (36, 3, 32, 32)
 grid = torchvision.utils.make_grid(imgs, nrow=6)
 plt.imshow(grid.permute(1, 2, 0))
 ```
 
-This is what the model generates after training for 50 epochs.
+This is what the model generates after training for 50 epochs on the CelebA
+dataset.
 
-!["Generated images CelebA"](img/generated_images_celeba.png)
+!["Generated images CelebA"](img/generated_images_CelebA.png)
 
-For generating CIFAR-10 images run:
+For generating CIFAR10 images run:
 ```python
-model = torch.load("realnvp_CIFAR10.pt", map_location: torch.device("cuda"))
+model = torch.load("realnvp_CIFAR10.pt")
 imgs = model.sample(n=36)  # img,shape = (36, 3, 32, 32)
 grid = torchvision.utils.make_grid(imgs, nrow=6)
 plt.imshow(grid.permute(1, 2, 0))
 ```
 
-This is what the model generates after training for 100 epochs.
+This is what the model generates after training for 350 epochs on the CIFAR10
+dataset.
 
-!["Generated images CIFAR10"](img/generated_images_cifar10.png) -->
+!["Generated images CIFAR10"](img/generated_images_CIFAR10.png)
