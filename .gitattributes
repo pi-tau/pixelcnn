@@ -1,6 +1,0 @@
-*.bin   linguist-detectable=false
-*.en    linguist-detectable=false
-*.de    linguist-detectable=false
-*.es    linguist-detectable=false
-
-*.ipynb linguist-vendored
