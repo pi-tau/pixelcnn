@@ -164,6 +164,8 @@ class PixelCNN(nn.Module):
             x: torch.Tensor
                 Tensor of shape (B, C, H, W). Note that the input must be the
                 raw pixel values of the image.
+
+        Returns:
             log_prob: torch.Tensor
                 Tensor of shape (B, C, H, W) giving the log probability of each
                 pixel conditioned on the previous pixels.
