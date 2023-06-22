@@ -22,7 +22,7 @@ class PositionalNorm(nn.LayerNorm):
 
     Usually, what is done in practice is to normalize only along the channels
     dimension. This operation is discussed in the paper "Positional normalization"
-    by Boyi Li et al., 2019.
+    by Boyi Li et al., 2019 - https://arxiv.org/abs/1907.04312
 
     The standard implementation of LayerNorm allows for normalizing along a
     specified number of dimensions, but they have to come last. Thus, we can
